@@ -22,7 +22,6 @@
     color:var(--ink);
     font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     image-rendering: pixelated;
-    overflow: hidden;
   }
   .grid-bg{
     position:fixed; inset:0; z-index:-1;
@@ -33,7 +32,8 @@
       linear-gradient(-45deg, var(--pink) 25%, transparent 25%),
       linear-gradient(45deg, transparent 75%, var(--dark-pink) 75%),
       linear-gradient(-45deg, transparent 75%, var(--dark-pink) 75%);
-    background-size: var(--bg-size) var(--bg-size);
+    background-size: 64px 64px;
+    animation: none; 
     background-position: 0 0, 0 calc(var(--bg-size)/2), calc(var(--bg-size)/2) calc(var(--bg-size)/-2), calc(var(--bg-size)/-2) 0px;
     animation: bg-pan 15s linear infinite;
     transition: background-color 0.2s linear;
@@ -46,9 +46,15 @@
   .detective-bg {
     background-color: #3d3531;
     background-image: linear-gradient(rgba(255,255,255,0.02) 2px, transparent 2px),
-                      linear-gradient(90deg, rgba(255,255,255,0.02) 2px, transparent 2px);
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 2px, transparent 2px),
+                      linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px);
     background-size: 64px 64px;
     animation: none; 
+  }
+  .look-back-bg {
+    background: radial-gradient(ellipse at top, #777 0%, #222 80%);
+    animation: none;
   }
   @keyframes bg-pan {
     0% { background-position: 0 0, 0 calc(var(--bg-size)/2), calc(var(--bg-size)/2) calc(var(--bg-size)/-2), calc(var(--bg-size)/-2) 0px; }
@@ -111,6 +117,19 @@
   }
   .sprite-container.left { left: calc(50% - 300px); }
   .sprite-container.right { right: calc(50% - 300px - 20px); }
+  .sprite-container.center-sprite {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+    margin: 20vh auto 0;
+    animation: none;
+    transform: none !important;
+  }
+  .sprite-container.center-sprite img {
+    position: absolute;
+    top: 0; left: 0;
+  }
   
   .textbox .speaker{
     position:absolute; top:-14px;
@@ -387,6 +406,13 @@
 
   /* Mobile adjustments */
   @media (max-width: 768px) {
+    html, body {
+      overflow-y: auto; 
+      height: auto; 
+    }
+    .screen {
+      padding-bottom: 120px; 
+    }
     .sprite-container {
       position: relative;
       bottom: auto;
@@ -455,6 +481,18 @@
     #scene-final .controls {
       flex-direction: column;
       align-items: center;
+    }
+    #look-back-trigger {
+      position: fixed;
+      bottom: 16px;
+      right: 16px;
+      width: 80px;
+      height: 80px;
+      cursor: pointer;
+      z-index: 200;
+    }
+    #look-back-trigger:hover {
+      transform: scale(1.1) !important;
     }
     .imessage-container {
       height: auto;
@@ -537,6 +575,24 @@
         "Everything starts somewhere…"
       </div>
     </div>
+    <div id="look-back-trigger" class="sprite-container pixel" role="button" title="Look back">
+      <img src="sprites/flamey_idle.gif" alt="A small, mysterious character sprite in the corner." />
+    </div>
+  </section>
+
+  <!-- LOOK BACK SCENE -->
+  <section id="scene-look-back" class="screen">
+    <div class="sprite-container center-sprite">
+      <img id="lookBackSprite1" src="sprites/cake_idle.gif" alt="A lone cake." />
+      <img id="lookBackSprite2" class="hidden" src="sprites/nadia_idle.gif" alt="A new character, Nadia, appears." />
+    </div>
+    <div class="textbox pixel">
+      <div id="lookBackSpeaker" class="speaker left">???</div>
+      <div id="lookBackText" class="content"></div>
+      <div class="controls">
+        <button id="lookBackContinue" class="pixel-btn">Continue</button>
+      </div>
+    </div>
   </section>
 
   <!-- FINAL SCENE -->
@@ -571,6 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
     doors: document.getElementById('scene-doors'),
     archives: document.getElementById('scene-archives'),
     first: document.getElementById('scene-first'),
+    'look-back': document.getElementById('scene-look-back'),
     final: document.getElementById('scene-final'),
   };
   const visited = { archives: false, first: false };
@@ -582,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
      CORE ENGINE
   =========================== */
   function showScene(key) {
-    document.querySelector('.grid-bg').classList.remove('glitch', 'detective-bg');
+    document.querySelector('.grid-bg').classList.remove('glitch', 'detective-bg', 'look-back-bg');
     const activeScene = document.querySelector('.screen.active');
     if (activeScene) activeScene.classList.remove('active');
     
@@ -602,6 +659,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case "first": initFirstScene(); break;
       case "archives": initArchivesScene(); break;
       case "final": playFinal(); break;
+      case "look-back": playLookBack(); break;
     }
   }
 
@@ -708,6 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const doorArchives = document.getElementById('door-archives');
   const doorFirst = document.getElementById('door-first');
   const doorLast = document.getElementById('door-last');
+  const lookBackTrigger = document.getElementById('look-back-trigger');
 
   function addDoorListener(door, callback) {
     door.addEventListener('click', callback);
@@ -715,7 +774,15 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   addDoorListener(doorArchives, () => { playDoorSfx(); showScene('archives'); });
-  addDoorListener(doorFirst, () => { playDoorSfx(); showScene('first'); });
+  addDoorListener(doorFirst, () => {
+    if (doorFirst.classList.contains('locked')) {
+    bump(doorFirst);
+      playDenied();
+      return;
+    }
+    playDoorSfx();
+    showScene('first');
+  });
   addDoorListener(doorLast, () => {
     if (doorLast.classList.contains('locked')) {
       bump(doorLast);
@@ -824,12 +891,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
     function initFirstScene() {
         document.querySelector('.grid-bg').classList.add('detective-bg');
+        lookBackTrigger.classList.remove('hidden');
+        initPolaroids();
         const board = document.querySelector('#scene-first .board-wrap');
         const polaroids = document.querySelectorAll('#scene-first .polaroid');
-
         board.classList.remove('visible');
         stringsSvg.classList.remove('visible');
-        polaroids.forEach(p => p.classList.remove('visible'));
 
         setTimeout(() => {
       board.classList.add('visible');
@@ -839,7 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
       polaroids.forEach((p, i) => {
         setTimeout(() => {
           p.classList.add('visible');
-        }, i * 60); // Staggered delay for each polaroid
+        }, i * 60); 
       });
     }, 400);
 
@@ -898,14 +965,73 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  sticky.addEventListener('click', () => { visited.first = true; showScene('doors'); });
-  window.addEventListener('resize', () => { if (scenes.first.classList.contains('active')) drawStrings(); });
+  sticky.addEventListener('click', () => { 
+    lookBackTrigger.classList.add('hidden');
+    visited.first = true; 
+    showScene('doors'); 
+  });
+  lookBackTrigger.addEventListener('click', () => {
+    lookBackTrigger.classList.add('hidden');
+    showScene('look-back');
+  });
+  window.addEventListener('resize', () => { 
+    if (scenes.first.classList.contains('active')) {
+      drawStrings(); 
+    }
+  });
+
+  /* ===========================
+     LOOK BACK SCENE
+  =========================== */
+  const lookBackLines = [
+    "there sits a lone cake waiting for you",
+    "i think you've seen enough to know where this is going.",
+    "the author isnt good at keeping surprises",
+    "im sorry in advance, but you must leave and proceed.",
+    "dont keep me waiting, okay?"
+  ];
+  const lookBackTextEl = document.getElementById('lookBackText');
+  const lookBackContinueBtn = document.getElementById('lookBackContinue');
+  const lookBackSpeakerEl = document.getElementById('lookBackSpeaker');
+  const lookBackSprite1 = document.getElementById('lookBackSprite1');
+  const lookBackSprite2 = document.getElementById('lookBackSprite2');
+  let lookBackLineIndex = 0;
+
+  async function playLookBack() {
+    document.querySelector('.grid-bg').classList.add('look-back-bg');
+    lookBackLineIndex = 0;
+    lookBackSpeakerEl.textContent = '???';
+    lookBackSprite1.classList.remove('hidden');
+    lookBackSprite2.classList.add('hidden');
+    lookBackContinueBtn.onclick = advanceLookBack;
+    await advanceLookBack();
+  }
+
+  async function advanceLookBack() {
+    if (lookBackLineIndex >= lookBackLines.length) {
+      // Force user back to doors
+      doorFirst.classList.add('locked');
+      doorFirst.querySelector('.label').textContent = 'first moment'; // Reset text but keep locked
+      visited.first = true; // Mark as visited
+      showScene('doors');
+      return;
+    }
+    lookBackContinueBtn.disabled = true;
+    await typeInto(lookBackTextEl, lookBackLines[lookBackLineIndex++]);
+
+    if (lookBackLineIndex === lookBackLines.length) { // On the last line
+      lookBackSpeakerEl.textContent = 'Nadia';
+      lookBackSprite2.classList.remove('hidden');
+      playGlitchSfx();
+    }
+    lookBackContinueBtn.disabled = false;
+  }
 
   /* ===========================
      FINAL SCENE
   =========================== */
   const finalLines = [
-    "I finally found you.", "In every thread and every note, it was always you.",
+    "Hey.","I finally found you.", "In every thread and every note, it was always you.",
     "I… I love you.", "Happy Birthday.",
   ];
   const finalEl = document.getElementById('finalText');
