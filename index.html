@@ -415,10 +415,11 @@
   <!-- DOORS HUB -->
   <section id="scene-doors" class="screen">
     <div class="textbox pixel">
-      <div class="speaker left">?</div>
-      <div class="content">
-        Three doors flicker into the grid. Choose wisely.
-      </div>
+      <div class="speaker left">Narrator..?</div>
+      <div id="doorsText" class="content"></div>
+      <div class="controls">
+        <button id="doorsContinue" class="pixel-btn">Continue</button>
+        </div>
     </div>
 
     <div class="doors">
@@ -521,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     switch (key) {
       case "landing": playLanding(); break;
-      case "doors": updateDoorLock(); break;
+      case "doors": playDoors(); updateDoorLock(); break;
       case "first": initFirstScene(); break;
       case "archives": initArchivesScene(); break;
       case "final": playFinal(); break;
@@ -593,6 +594,39 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ===========================
      DOORS (HUB)
   =========================== */
+  const doorsLines = [
+    "You find yourself in a mysterious room.",
+    "In front of you are three doors, but it seems like the last door is locked.",
+    "You should start with the first door. Or the second one.",
+    "The uncertainty of this situation fills you with fear.",
+    "What danger lies between these doors?",
+    "(That creature is not to be trusted..)",
+    "But it looks kind. Maybe judging the situation is not wise.",
+    "For the time being, I'll leave you to it. Time is infinite here. Do not rush."
+  ];
+  const doorsTextEl = document.getElementById('doorsText');
+  const doorsContinueBtn = document.getElementById('doorsContinue');
+  let doorsLineIndex = 0;
+
+  async function playDoors() {
+    doorsLineIndex = 0;
+    doorsContinueBtn.textContent = 'Continue';
+    doorsContinueBtn.classList.remove('hidden');
+    doorsContinueBtn.onclick = advanceDoors;
+    await advanceDoors();
+  }
+
+  async function advanceDoors() {
+    if (doorsLineIndex >= doorsLines.length) {
+      doorsContinueBtn.classList.add('hidden');
+      return;
+    }
+
+    doorsContinueBtn.disabled = true;
+    await typeInto(doorsTextEl, doorsLines[doorsLineIndex++]);
+    doorsContinueBtn.disabled = false;
+  }
+
   const doorArchives = document.getElementById('door-archives');
   const doorFirst = document.getElementById('door-first');
   const doorLast = document.getElementById('door-last');
