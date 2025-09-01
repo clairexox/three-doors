@@ -368,14 +368,14 @@
   @keyframes typing{ 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
 
   /* Final confession - centered */
-  .cake-btn{
-    display:inline-block; margin-top:24px; padding:12px 16px;
-    border:4px solid var(--ink); text-decoration:none; color:var(--ink);
-    font-weight:800; background:#fff;
-    box-shadow: 0 6px 0 0 var(--ink);
+  .cake-btn, #butBtn{
+    display:inline-block; margin-top:16px; padding:8px 12px;
+    border:3px solid var(--ink); text-decoration:none; color:var(--ink);
+    font-weight:700; background:#fff;
+    box-shadow: 0 4px 0 0 var(--ink);
     transition: transform 0.1s, box-shadow 0.1s;
   }
-  .cake-btn:active{ transform: translateY(2px); box-shadow: 0 4px 0 0 var(--ink); }
+  .cake-btn:active, #butBtn:active{ transform: translateY(2px); box-shadow: 0 2px 0 0 var(--ink); }
 
   .birthday-cake{ font-size: 48px; margin: 20px 0; display: block; }
 
@@ -474,14 +474,14 @@
   <!-- FINAL SCENE -->
   <section id="scene-final" class="screen">
     <div class="sprite-container right">
-      <!-- Add your <img src="francine-sprite.png"> here -->
+     <img src="sprites/flamey_bday.gif" alt="placeholder" />
     </div>
     <div class="textbox pixel">
-      <div id="finalSpeaker" class="speaker left">Francine</div>
+      <div id="finalSpeaker" class="speaker left">Flamey</div>
       <div id="finalText" class="content"></div>
       <div class="controls">
         <button id="finalContinue" class="pixel-btn">Continue</button>
-        <button id="butBtn" class="pixel-btn hidden">but..</button>
+        <button id="butBtn" class="pixel-btn hidden">Hold on!</button>
         <a id="cake" class="cake-btn hidden" href="https://example.com">[ 🎂 cake ]</a>
       </div>
     </div>
@@ -508,6 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const visited = { archives: false, first: false };
   let audioCtx;
   let musicTimer = null;
+  let doorsDialoguePlayed = false;
 
   /* ===========================
      CORE ENGINE
@@ -522,7 +523,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     switch (key) {
       case "landing": playLanding(); break;
-      case "doors": playDoors(); updateDoorLock(); break;
+      case "doors":
+        if (!doorsDialoguePlayed) {
+          playDoors();
+        } else {
+          document.querySelector('#scene-doors .textbox').classList.add('hidden');
+        }
+        updateDoorLock(); 
+        break;
       case "first": initFirstScene(); break;
       case "archives": initArchivesScene(); break;
       case "final": playFinal(); break;
@@ -609,6 +617,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let doorsLineIndex = 0;
 
   async function playDoors() {
+    doorsDialoguePlayed = true;
+    document.querySelector('#scene-doors .textbox').classList.remove('hidden');
     doorsLineIndex = 0;
     doorsContinueBtn.textContent = 'Continue';
     doorsContinueBtn.classList.remove('hidden');
