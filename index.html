@@ -387,11 +387,43 @@
 
   /* Mobile adjustments */
   @media (max-width: 768px) {
+    .sprite-container {
+      bottom: 150px; /* Bring sprite down a bit */
+      width: 90px;   /* Make sprite smaller */
+      height: 90px;
+      animation: none; /* Optional: disable hover on mobile */
+    }
     .sprite-container.left { left: 10px; }
     .sprite-container.right { right: 10px; }
+    .textbox {
+      padding: 12px 16px 16px;
+      bottom: 16px;
+    }
+    .textbox .content {
+      font-size: 0.9rem;
+      min-height: 50px;
+    }
     .textbox .speaker.left { left: 20px; }
     .textbox .speaker.right { right: 20px; }
-    .doors { grid-template-columns: 1fr; }
+    .doors { 
+      grid-template-columns: 1fr; 
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .board-wrap {
+      padding: 15px;
+      margin-top: 16px;
+    }
+    .polaroids {
+      gap: 16px;
+    }
+    .polaroid {
+      height: 140px;
+    }
+    #scene-final .controls {
+      flex-direction: column;
+      align-items: center;
+    }
   }
 </style>
 </head>
