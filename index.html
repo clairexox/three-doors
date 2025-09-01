@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>monochrome.pixel.adventure</title>
+<style>
+  :root{
+    --cream:#ffffff;
+    --ink:#111;
+    --ink-2:#333;
+    --green: #3a9947;
+    --dark-green: #2a7033;
+    --light-green: #61b36c;
+    --shadow:#00000030;
+  }
+
+  /* Animated checkered background */
+  html,body{
+    height:100%;
+    margin:0;
+    color:var(--ink);
+    font-family: ui-monospace, Menlo, Monaco, "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    image-rendering: pixelated;
+    overflow: hidden;
+  }
+  .grid-bg{
+    position:fixed; inset:0; z-index:-1;
+    --bg-size: 48px;
+    background-color: var(--ink);
+    background-image:
+      linear-gradient(45deg, var(--green) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--green) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--dark-green) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--dark-green) 75%);
+    background-size: var(--bg-size) var(--bg-size);
+    background-position: 0 0, 0 calc(var(--bg-size)/2), calc(var(--bg-size)/2) calc(var(--bg-size)/-2), calc(var(--bg-size)/-2) 0px;
+    animation: bg-pan 15s linear infinite;
+    transition: background-color 0.2s linear;
+  }
+  .grid-bg.glitch {
+    background-color: #fff;
+    --green: #fff;
+    --dark-green: #000;
+  }
+  .detective-bg {
+    background-color: #3d3531;
+    background-image: linear-gradient(rgba(255,255,255,0.02) 2px, transparent 2px),
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 2px, transparent 2px);
+    background-size: 64px 64px;
+    animation: none; 
+  }
+  @keyframes bg-pan {
+    0% { background-position: 0 0, 0 calc(var(--bg-size)/2), calc(var(--bg-size)/2) calc(var(--bg-size)/-2), calc(var(--bg-size)/-2) 0px; }
+    100% { background-position: var(--bg-size) var(--bg-size), var(--bg-size) calc(var(--bg-size) + var(--bg-size)/2), calc(var(--bg-size) + var(--bg-size)/2) calc(var(--bg-size)/-2), calc(var(--bg-size) + var(--bg-size)/-2) 0px; }
+  }
+
+  /* Layout helpers */
+  .screen{
+    display:none;
+    min-height:100dvh;
+    padding: clamp(16px, 4vw, 48px);
+    box-sizing:border-box;
+    position:relative;
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+  }
+  .screen.active{ display:block; opacity: 1; }
+
+  /* Pixel border */
+  .pixel{
+    border:4px solid var(--ink);
+    outline:2px solid var(--ink);
+    outline-offset:-10px;
+    box-shadow:
+      0 0 0 4px var(--ink) inset,
+      0 8px 0 0 var(--ink),
+      0 8px 0 4px var(--shadow);
+  }
+
+  /* Textbox */
+  .textbox{
+    max-width: 600px;
+    width: 90%;
+    margin: 0 auto;
+    background: #fff;
+    padding: 18px 20px 20px;
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+  }
+  
+  /* Sprite positioning & animation */
+  .sprite-container{
+    position: absolute;
+    bottom: 170px; 
+    width: 120px;
+    height: 120px;
+    z-index: 101;
+    animation: idle-hover 3s ease-in-out infinite;
+  }
+  .sprite-container img {
+    width: 100%;
+    height: 100%;
+  }
+  @keyframes idle-hover {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .sprite-container.left { left: calc(50% - 300px); }
+  .sprite-container.right { right: calc(50% - 300px - 20px); }
+  
+  .textbox .speaker{
+    position:absolute; top:-14px;
+    background:#fff; padding:2px 8px;
+    border:2px solid var(--ink);
+    font-weight:700;
+  }
+  .textbox .speaker.left { left: 80px; }
+  .textbox .speaker.right { right: 80px; text-align: right; }
+
+  .textbox .content{
+    min-height: 60px;
+    white-space: pre-wrap;
+    line-height:1.6;
+    margin-left: 0;
+  }
+  .textbox .controls{
+    display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;
+    justify-content: center;
+  }
+  button.pixel-btn{
+    background:#fff; color:var(--ink);
+    border:3px solid var(--ink);
+    padding:8px 12px;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow: 0 4px 0 0 var(--ink);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  button.pixel-btn:active{ transform: translateY(2px); box-shadow: 0 2px 0 0 var(--ink); }
+  button.pixel-btn[disabled]{ opacity:0.5; cursor:not-allowed; }
+
+  /* Doors hub */
+  .doors{
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: clamp(24px, 5vw, 60px);
+    max-width: 1000px; margin:48px auto 0;
+  }
+  .door{
+    background:#fff;
+    height: 240px;
+    position:relative;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    transition: transform .1s ease-out;
+    background-image:
+      linear-gradient(0deg, rgba(0,0,0,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .door:hover { transform: scale(1.03); }
+  .door:active{ transform: translateY(2px) scale(1.03); }
+  .door .label{
+    position:absolute; bottom:8px; left:8px; right:8px;
+    text-align:center; font-weight:800; border-top:2px dashed var(--ink-2); padding-top:6px;
+  }
+  .door .pixel-door-art{
+    width:60%; height:70%;
+    background:
+      repeating-linear-gradient(90deg, #eee 0 6px, #ddd 6px 12px);
+    border:4px solid var(--ink);
+    box-shadow: inset 0 0 0 6px #fff, 0 0 0 6px #000;
+    position:relative;
+  }
+  .door .pixel-door-art:after{ /* handle */
+    content:""; position:absolute; right:10%; top:48%;
+    width:8px; height:8px; background:var(--ink);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink);
+  }
+  .door.locked{
+    filter: grayscale(1) contrast(0.7) brightness(0.95);
+    cursor:not-allowed;
+  }
+  .door.locked:hover { transform: none; }
+  .door.locked .label::after{
+    content:" (locked)";
+    font-weight:400;
+  }
+
+  /* 3D cubes room */
+  .space{
+    perspective: 900px;
+    height: 60vh;
+    max-width:1200px; margin: 0 auto;
+    position:relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cube{
+    position:relative; width: 100px; height: 100px; transform-style: preserve-3d;
+    animation: float 8s ease-in-out infinite;
+    cursor:pointer;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: transform 0.8s cubic-bezier(0.2, 1, 0.3, 1), opacity 0.6s 0.1s ease-out;
+  }
+  .cube.appear{
+    opacity: 1;
+    transform: scale(1);
+  }
+  .cube.visited{ outline: 6px solid var(--ink); }
+  @keyframes float{
+    0%,100%{ transform: translateZ(0) rotateX(0deg) rotateY(0deg); }
+    50%{ transform: translateZ(40px) rotateX(10deg) rotateY(18deg); }
+  }
+  .face{
+    position:absolute; width:100%; height:100%; background:#fff;
+    border:3px solid var(--ink);
+    display:flex; align-items:center; justify-content:center; font-weight:800;
+    box-shadow: inset 0 0 40px #00000010;
+    background-image:
+      linear-gradient(0deg, rgba(0,0,0,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px);
+    background-size: 12px 12px;
+  }
+  .face:nth-child(1){ transform: rotateY(0deg) translateZ(50px); }
+  .face:nth-child(2){ transform: rotateY(90deg) translateZ(50px); }
+  .face:nth-child(3){ transform: rotateY(180deg) translateZ(50px); }
+  .face:nth-child(4){ transform: rotateY(-90deg) translateZ(50px); }
+  .face:nth-child(5){ transform: rotateX(90deg) translateZ(50px); }
+  .face:nth-child(6){ transform: rotateX(-90deg) translateZ(50px); }
+  .glow{ box-shadow: 0 0 16px 4px #00000066, inset 0 0 32px #00000066; }
+
+  /* Polaroid spy-board */
+  .board-wrap{
+    max-width:1100px; margin: 24px auto; position:relative;
+    padding: 30px;
+    border: 12px solid #6b4f3a;
+    background-color: #d2b48c;
+    background-image: linear-gradient(45deg, rgba(0,0,0,0.03) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.03) 75%, rgba(0,0,0,0.03)),
+                      linear-gradient(45deg, rgba(0,0,0,0.03) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.03) 75%, rgba(0,0,0,0.03));
+    background-size: 3px 3px;
+    background-position: 0 0, 1.5px 1.5px;
+    box-shadow: 0 12px 24px 0px #0000004d, inset 0 0 12px #00000033;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  .board-wrap.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  #string-svg{
+    position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.8s 0.5s ease-in;
+  }
+  #string-svg.visible {
+    opacity: 1;
+  }
+  .polaroids{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+    gap: 24px;
+  }
+  .polaroid{
+    background-color: transparent;
+    height: 160px;
+    perspective: 1000px;
+    border: none;
+    box-shadow: none;
+    cursor: pointer;
+    transform: rotate(var(--r, -2deg));
+    transition: transform 0.2s ease;
+  }
+  .polaroid:hover { 
+    transform: rotate(var(--r, -2deg)) scale(1.05);
+    z-index: 10;
+  }
+  .polaroid-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+    box-shadow: 6px 6px 0 0 var(--ink);
+  }
+  .polaroid-inner.is-flipped {
+    transform: rotateY(180deg);
+  }
+  .polaroid-front, .polaroid-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden; 
+    backface-visibility: hidden;
+    box-sizing: border-box;
+    background: #fff;
+    padding: 10px 10px 18px;
+    text-align: center;
+    border: 3px solid var(--ink);
+  }
+  .polaroid-front:before{
+    content:""; position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+    width:46px; height:14px; background:#eee; border:2px solid var(--ink);
+  }
+  .polaroid-back {
+    transform: rotateY(180deg);
+    padding: 18px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.9em;
+  }
+  .polaroid .img{ 
+    background-color: #ddd;
+    height: 90px; 
+    margin-bottom: 8px; 
+    border: 2px solid var(--ink);
+    background-size: cover;
+    background-position: center;
+  }
+  .sticky-note{
+    position:absolute; right:16px; top:16px; width:200px;
+    background:#fff; padding:10px; border:3px solid var(--ink);
+    transform: rotate(2deg);
+    box-shadow: 8px 8px 0 0 var(--ink);
+    cursor:pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .sticky-note:hover { transform: rotate(4deg) scale(1.05); box-shadow: 10px 10px 0 0 var(--ink); }
+
+  /* iMessage style for easter egg */
+  .imessage-container{
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 20px;
+    height: 70vh;
+    overflow-y: auto;
+    display: none; /* Toggled by JS */
+    border: 4px solid var(--ink);
+    box-shadow: 0 8px 0 0 var(--ink);
+  }
+  .imessage-container.active{ display: block; }
+  .message{
+    margin: 10px 0; padding: 12px 16px; border-radius: 18px;
+    max-width: 70%; word-wrap: break-word;
+    opacity: 0; animation: fadeIn 0.5s forwards;
+    border: 2px solid var(--ink);
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .message.user{ background: #007AFF; color: white; margin-left: auto; text-align: right; border-color: #0056b3; }
+  .message.character{ background: #E5E5EA; color: black; margin-right: auto; }
+  .typing-indicator{
+    background: #E5E5EA; padding: 12px 16px; border-radius: 18px;
+    margin: 10px 0; max-width: 70%; margin-right: auto; display: none;
+    border: 2px solid var(--ink);
+  }
+  .typing-dots{ display: inline-block; animation: typing 1.5s infinite; }
+  @keyframes typing{ 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
+
+  /* Final confession - centered */
+  .cake-btn{
+    display:inline-block; margin-top:24px; padding:12px 16px;
+    border:4px solid var(--ink); text-decoration:none; color:var(--ink);
+    font-weight:800; background:#fff;
+    box-shadow: 0 6px 0 0 var(--ink);
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .cake-btn:active{ transform: translateY(2px); box-shadow: 0 4px 0 0 var(--ink); }
+
+  .birthday-cake{ font-size: 48px; margin: 20px 0; display: block; }
+
+  /* Minor helpers */
+  .hidden { display: none !important; }
+  .center { text-align:center; }
+  .mt{ margin-top:16px; }
+  .sr{ position:absolute; left:-9999px; }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    .sprite-container.left { left: 10px; }
+    .sprite-container.right { right: 10px; }
+    .textbox .speaker.left { left: 20px; }
+    .textbox .speaker.right { right: 20px; }
+    .doors { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <!-- LANDING -->
+  <section id="scene-landing" class="screen active">
+    <div class="sprite-container right">
+    <img src="sprites/flamey_talk.gif" alt="Pixel character standing with a gentle smile, facing forward. The character appears friendly and inviting, set against a softly animated checkered background that suggests a digital or game-like environment. The overall mood is warm and welcoming." />
+    </div>
+    <div class="textbox pixel">
+      <div class="speaker left">???</div>
+      <div id="landingText" class="content"></div>
+      <div class="controls">
+        <button id="landingContinue" class="pixel-btn">Continue</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOORS HUB -->
+  <section id="scene-doors" class="screen">
+    <div class="textbox pixel">
+      <div class="speaker left">?</div>
+      <div class="content">
+        Three doors flicker into the grid. Choose wisely.
+      </div>
+    </div>
+
+    <div class="doors">
+      <div id="door-archives" class="door pixel" role="button" tabindex="0" aria-label="Open Archives">
+        <div class="pixel-door-art" aria-hidden="true"></div>
+        <div class="label">archives</div>
+      </div>
+      <div id="door-first" class="door pixel" role="button" tabindex="0" aria-label="Open First Moment">
+        <div class="pixel-door-art" aria-hidden="true"></div>
+        <div class="label">first moment</div>
+      </div>
+      <div id="door-last" class="door pixel locked" aria-disabled="true" aria-label="Locked Door">
+        <div class="pixel-door-art" aria-hidden="true"></div>
+        <div class="label">???</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHIVES ROOM -->
+  <section id="scene-archives" class="screen">
+    <div class="textbox pixel">
+      <div class="speaker left">?</div>
+      <div id="archivesText" class="content"></div>
+      <div class="controls">
+        <button id="archivesContinue" class="pixel-btn hidden">Continue</button>
+        <button id="archivesReturn" class="pixel-btn hidden">return to doors</button>
+      </div>
+    </div>
+    <div id="space" class="space" aria-label="floating cubes zone"></div>
+  </section>
+
+  <!-- FIRST MOMENT ROOM -->
+  <section id="scene-first" class="screen">
+    <div class="textbox pixel">
+      <div class="speaker left">?</div>
+      <div class="content">A quiet room. Threads connect memories like a spy board.</div>
+    </div>
+
+    <div class="board-wrap pixel">
+      <svg id="string-svg"></svg>
+      <div id="polaroids" class="polaroids" aria-label="polaroid grid">
+        <!-- 12 placeholder polaroids -->
+      </div>
+      <div id="sticky" class="sticky-note pixel" title="Back to doors">
+        <strong>NOTE</strong><br/>
+        Click me to warp back.<br/><br/>
+        "Everything starts somewhere…"
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL SCENE -->
+  <section id="scene-final" class="screen">
+    <div class="sprite-container right">
+      <!-- Add your <img src="francine-sprite.png"> here -->
+    </div>
+    <div class="textbox pixel">
+      <div id="finalSpeaker" class="speaker left">Francine</div>
+      <div id="finalText" class="content"></div>
+      <div class="controls">
+        <button id="finalContinue" class="pixel-btn">Continue</button>
+        <button id="butBtn" class="pixel-btn hidden">but..</button>
+        <a id="cake" class="cake-btn hidden" href="https://example.com">[ 🎂 cake ]</a>
+      </div>
+    </div>
+    <div id="imessageContainer" class="imessage-container">
+      <div id="messageArea"></div>
+      <div id="typingIndicator" class="typing-indicator">
+        <span class="typing-dots">...</span>
+      </div>
+    </div>
+  </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  /* ===========================
+     STATE & DOM REFERENCES
+  =========================== */
+  const scenes = {
+    landing: document.getElementById('scene-landing'),
+    doors: document.getElementById('scene-doors'),
+    archives: document.getElementById('scene-archives'),
+    first: document.getElementById('scene-first'),
+    final: document.getElementById('scene-final'),
+  };
+  const visited = { archives: false, first: false };
+  let audioCtx;
+  let musicTimer = null;
+
+  /* ===========================
+     CORE ENGINE
+  =========================== */
+  function showScene(key) {
+    document.querySelector('.grid-bg').classList.remove('glitch', 'detective-bg');
+    const activeScene = document.querySelector('.screen.active');
+    if (activeScene) activeScene.classList.remove('active');
+    
+    scenes[key].classList.add('active');
+    startMusic(key);
+
+    switch (key) {
+      case "landing": playLanding(); break;
+      case "doors": updateDoorLock(); break;
+      case "first": initFirstScene(); break;
+      case "archives": initArchivesScene(); break;
+      case "final": playFinal(); break;
+    }
+  }
+
+  function typeInto(el, text, speed = 24) {
+    return new Promise(resolve => {
+      el.textContent = "";
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i < text.length) {
+          el.textContent += text[i++];
+        } else {
+          clearInterval(interval);
+          resolve();
+        }
+      }, speed);
+    });
+  }
+
+  /* ===========================
+     LANDING SCENE
+  =========================== */
+  const landingLines = [
+    "Oh hello!! It's finally good seeing you again!",
+    "Don't be worried, I'm here to help you. Look, you might not know me now but you'll remember soon.",
+    "Today is your special day, remember? Your friends have all gathered for you.",
+    "Did you really forget this much?",
+    "Silly, its your birthday!"
+  ];
+  const landingEl = document.getElementById('landingText');
+  const landingContinue = document.getElementById('landingContinue');
+  let landingLineIndex = 0;
+
+  async function playLanding() {
+    document.querySelector('.grid-bg').classList.remove('glitch');
+    const landingSprite = document.querySelector('#scene-landing .sprite-container img');
+    if (landingSprite) {
+        landingSprite.src = "sprites/flamey_talk.gif";
+    }
+    landingLineIndex = 0;
+    landingContinue.textContent = 'Continue';
+    landingContinue.onclick = advanceLanding;
+    await advanceLanding();
+  }
+
+  async function advanceLanding() {
+    if (landingLineIndex >= landingLines.length) {
+      playDoorSfx();
+      showScene('doors');
+      return;
+    }
+    landingContinue.disabled = true;
+    await typeInto(landingEl, landingLines[landingLineIndex++]);
+    if (landingLineIndex === 4) {
+      document.querySelector('.grid-bg').classList.add('glitch');
+      const landingSprite = document.querySelector('#scene-landing .sprite-container img');
+      if (landingSprite) {
+          landingSprite.src = "sprites/flamey_glitch.jpg";
+      }
+    }
+    if (landingLineIndex >= landingLines.length) {
+      landingContinue.textContent = 'Follow the voice';
+    }
+    landingContinue.disabled = false;
+  }
+
+  /* ===========================
+     DOORS (HUB)
+  =========================== */
+  const doorArchives = document.getElementById('door-archives');
+  const doorFirst = document.getElementById('door-first');
+  const doorLast = document.getElementById('door-last');
+
+  function addDoorListener(door, callback) {
+    door.addEventListener('click', callback);
+    door.addEventListener('keydown', e => { if (e.key === 'Enter') callback(); });
+  }
+
+  addDoorListener(doorArchives, () => { playDoorSfx(); showScene('archives'); });
+  addDoorListener(doorFirst, () => { playDoorSfx(); showScene('first'); });
+  addDoorListener(doorLast, () => {
+    if (doorLast.classList.contains('locked')) {
+      bump(doorLast);
+      playDenied();
+      return;
+    }
+    playDoorSfx();
+    showScene('final');
+  });
+
+  function updateDoorLock() {
+    if (visited.archives && visited.first) {
+      doorLast.classList.remove('locked');
+      doorLast.removeAttribute('aria-disabled');
+      doorLast.querySelector('.label').textContent = 'final room';
+    }
+  }
+
+  function bump(el) {
+    el.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-4px)' }, { transform: 'translateY(0)' }], { duration: 120 });
+  }
+
+  /* ===========================
+     ARCHIVES (SEQUENTIAL CUBES)
+  =========================== */
+  const space = document.getElementById('space');
+  const archivesTextEl = document.getElementById('archivesText');
+  const archivesContinueBtn = document.getElementById('archivesContinue');
+  const archivesReturnBtn = document.getElementById('archivesReturn');
+  const sweetNotes = [
+    "you're braver than you think.", "thank you for being here.", "your laugh is my favorite sound.",
+    "i notice the small things you do.", "the world is softer with you in it.", "i'm cheering for you—always.",
+  ];
+  let currentCube = null;
+  let noteIndex = 0;
+
+  async function initArchivesScene() {
+    noteIndex = 0;
+    space.innerHTML = '';
+    archivesContinueBtn.classList.add('hidden');
+    archivesReturnBtn.classList.add('hidden');
+    await typeInto(archivesTextEl, "Ominous cubes hum… but they hide gentle words. Touch them.");
+    await new Promise(res => setTimeout(res, 500));
+    showNextCube();
+  }
+
+  function showNextCube() {
+    if (currentCube) currentCube.remove();
+    
+    if (noteIndex >= sweetNotes.length) {
+      typeInto(archivesTextEl, "You've found all the notes. The kindness was always there.");
+      archivesReturnBtn.classList.remove('hidden');
+      return;
+    }
+
+    currentCube = createCube();
+    space.appendChild(currentCube);
+    setTimeout(() => currentCube.classList.add('appear'), 100);
+  }
+
+  function createCube() {
+    const c = document.createElement('div');
+    c.className = 'cube';
+    c.innerHTML = `<div class="face glow">▯</div>`.repeat(6);
+    c.onclick = async () => {
+      c.onclick = null; // Prevent double clicks
+      c.classList.add('visited');
+      playCubePing();
+      await typeInto(archivesTextEl, `"${sweetNotes[noteIndex]}"`);
+      noteIndex++;
+      archivesContinueBtn.classList.remove('hidden');
+    };
+    return c;
+  }
+
+  archivesContinueBtn.addEventListener('click', () => {
+    archivesContinueBtn.classList.add('hidden');
+    showNextCube();
+  });
+
+  archivesReturnBtn.addEventListener('click', () => {
+    visited.archives = true;
+    showScene('doors');
+  });
+
+  /* ===========================
+     FIRST MOMENT (POLAROIDS)
+  =========================== */
+  const polaroidsWrap = document.getElementById('polaroids');
+  const stringsSvg = document.getElementById('string-svg');
+  const sticky = document.getElementById('sticky');
+  const polaroidData = [
+    { img: 'path/to/your/image1.png', text: "The day we met." },
+    { img: 'path/to/your/image2.png', text: "Our first coffee." },
+    { img: 'path/to/your/image3.png', text: "That rainy afternoon." },
+    { img: 'path/to/your/image4.png', text: "When you made me laugh so hard." },
+    { img: 'path/to/your/image5.png', text: "The concert." },
+    { img: 'path/to/your/image6.png', text: "Our late-night talk." },
+    { img: 'path/to/your/image7.png', text: "That silly argument." },
+    { img: 'path/to/your/image8.png', text: "The promise we made." },
+    { img: 'path/to/your/image9.png', text: "Your favorite spot." },
+    { img: 'path/to/your/image10.png', text: "My favorite photo of you." },
+    { img: 'path/to/your/image11.png', text: "A secret I never told." },
+    { img: 'path/to/your/image12.png', text: "The start of everything." }
+  ];
+  
+    function initFirstScene() {
+        document.querySelector('.grid-bg').classList.add('detective-bg');
+        const board = document.querySelector('#scene-first .board-wrap');
+        const polaroids = document.querySelectorAll('#scene-first .polaroid');
+
+        board.classList.remove('visible');
+        stringsSvg.classList.remove('visible');
+        polaroids.forEach(p => p.classList.remove('visible'));
+
+        setTimeout(() => {
+      board.classList.add('visible');
+    }, 100);
+
+    setTimeout(() => {
+      polaroids.forEach((p, i) => {
+        setTimeout(() => {
+          p.classList.add('visible');
+        }, i * 60); // Staggered delay for each polaroid
+      });
+    }, 400);
+
+    setTimeout(() => {
+      drawStrings();
+      stringsSvg.classList.add('visible');
+    }, 1200);
+  }
+
+  function initPolaroids() {
+    polaroidsWrap.innerHTML = '';
+    for (let i = 0; i < polaroidData.length; i++) {
+      const p = document.createElement('div');
+      p.className = 'polaroid';
+      p.style.setProperty('--r', `${(Math.random() * 6) - 3}deg`);
+      p.innerHTML = `
+      <div class="polaroid-inner">
+        <div class="polaroid-front">
+            <div class="img" aria-hidden="true"></div>
+            <div>polaroid #${i + 1}</div>
+        </div>
+        <div class="polaroid-back">
+          <div>${polaroidData[i].text}</div>
+        </div>
+      </div>
+    `;
+    p.addEventListener('click', () => {
+        playFlipSfx();
+        p.querySelector('.polaroid-inner').classList.toggle('is-flipped');
+      });
+      polaroidsWrap.appendChild(p);
+    }
+  }
+
+  function drawStrings() {
+    stringsSvg.innerHTML = '';
+    const rect = polaroidsWrap.getBoundingClientRect();
+    const cards = [...polaroidsWrap.children];
+    const points = cards.map(card => {
+      const r = card.getBoundingClientRect();
+      return { x: r.left - rect.left + r.width / 2, y: r.top - rect.top + r.height / 2 };
+    });
+    points.sort(() => Math.random() - 0.5);
+    const svgNS = 'http://www.w3.org/2000/svg';
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1];
+      const path = document.createElementNS(svgNS, 'path');
+      const midx = (a.x + b.x) / 2, midy = (a.y + b.y) / 2;
+      const d = `M ${a.x},${a.y} Q ${midx + ((Math.random() * 80) - 40)},${midy + ((Math.random() * 80) - 40)} ${b.x},${b.y}`;
+      path.setAttribute('d', d);
+      path.setAttribute('stroke', '#d43939');
+      path.setAttribute('stroke-width', '3');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-linecap', 'round');
+      stringsSvg.appendChild(path);
+    }
+  }
+
+  sticky.addEventListener('click', () => { visited.first = true; showScene('doors'); });
+  window.addEventListener('resize', () => { if (scenes.first.classList.contains('active')) drawStrings(); });
+
+  /* ===========================
+     FINAL SCENE
+  =========================== */
+  const finalLines = [
+    "I finally found you.", "In every thread and every note, it was always you.",
+    "I… I love you.", "Happy Birthday.",
+  ];
+  const finalEl = document.getElementById('finalText');
+  const finalContinueBtn = document.getElementById('finalContinue');
+  const butBtn = document.getElementById('butBtn');
+  const cakeLink = document.getElementById('cake');
+  const finalTextbox = document.querySelector('#scene-final .textbox');
+  const finalSprite = document.querySelector('#scene-final .sprite-container');
+  const imessageContainer = document.getElementById('imessageContainer');
+  const messageArea = document.getElementById('messageArea');
+  const typingIndicator = document.getElementById('typingIndicator');
+  let finalLineIndex = 0;
+
+  async function playFinal() {
+    finalLineIndex = 0;
+    finalContinueBtn.textContent = 'Continue';
+    finalContinueBtn.classList.remove('hidden');
+    butBtn.classList.add('hidden');
+    cakeLink.classList.add('hidden');
+    finalTextbox.classList.remove('hidden');
+    finalSprite.classList.remove('hidden');
+    imessageContainer.classList.remove('active');
+    finalContinueBtn.onclick = advanceFinal;
+    await advanceFinal();
+  }
+
+  async function advanceFinal() {
+    if (finalLineIndex >= finalLines.length) {
+      finalContinueBtn.classList.add('hidden');
+      cakeLink.classList.remove('hidden');
+      butBtn.classList.remove('hidden');
+      return;
+    }
+    finalContinueBtn.disabled = true;
+    await typeInto(finalEl, finalLines[finalLineIndex++]);
+    finalContinueBtn.disabled = false;
+  }
+
+  butBtn.addEventListener('click', () => {
+    finalTextbox.classList.add('hidden');
+    finalSprite.classList.add('hidden');
+    imessageContainer.classList.add('active');
+    playEasterEggChat();
+  });
+
+  async function playEasterEggChat() {
+    messageArea.innerHTML = '';
+    const messages = [
+      { type: 'user', text: 'but..' },
+      { type: 'character', text: 'but?' },
+      { type: 'user', text: 'I have more to say.' },
+      { type: 'character', text: 'Oh! You found the secret chat!' },
+      { type: 'character', text: 'I guess you can tell me here.' },
+      { type: 'user', text: 'This is amazing, Francine.' },
+      { type: 'character', text: 'Hehe, I hoped you\'d like it. Now, about that cake...' },
+      { type: 'character', text: 'I\'ll take you there. Redirecting in 3... 2... 1...' }
+    ];
+
+    for (const msg of messages) {
+      await new Promise(res => setTimeout(res, 500));
+      if (msg.type === 'character') {
+        typingIndicator.style.display = 'block';
+        imessageContainer.scrollTop = imessageContainer.scrollHeight;
+        await new Promise(res => setTimeout(res, 1200));
+        typingIndicator.style.display = 'none';
+      }
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${msg.type}`;
+      messageDiv.textContent = msg.text;
+      messageArea.appendChild(messageDiv);
+      imessageContainer.scrollTop = imessageContainer.scrollHeight;
+      playCubePing(msg.type === 'user' ? 0.8 : 1.2);
+    }
+
+    setTimeout(() => window.open(cakeLink.href, '_blank'), 2000);
+  }
+
+  /* ===========================
+     AUDIO
+  =========================== */
+  function getCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function beep(freq = 440, dur = 0.08, type = 'square', gain = 0.04) {
+    const ctx = getCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = gain;
+    o.connect(g).connect(ctx.destination);
+    o.start();
+    o.stop(ctx.currentTime + dur);
+  }
+
+  function playDoorSfx() { beep(180, 0.05, 'square', 0.05); setTimeout(() => beep(320, 0.06, 'square', 0.05), 60); }
+  function playDenied() { beep(80, 0.15, 'square', 0.06); }
+  function playGlitchSfx() { beep(100, 0.25, 'sawtooth', 0.07); }
+  function playFlipSfx() { beep(400, 0.06, 'sine', 0.03); }
+  function playCubePing(mult = 1) { beep(600 * mult, 0.07, 'triangle', 0.035); setTimeout(() => beep(920 * mult, 0.07, 'triangle', 0.03), 80); }
+
+  function startMusic(scene) {
+    stopMusic();
+    const ctx = getCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const seqs = {
+      landing: [220, 277, 330, 277], doors: [196, 220, 247, 220],
+      archives: [174, 233, 207, 155], first: [262, 294, 330, 294],
+      final: [196, 262, 330, 392],
+    };
+    const vol = { landing: 0.015, doors: 0.018, archives: 0.014, first: 0.012, final: 0.02 }[scene] || 0.015;
+    const seq = seqs[scene] || [220, 330, 440, 330];
+    let i = 0;
+    musicTimer = setInterval(() => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = seq[i++ % seq.length];
+      g.gain.value = vol;
+      o.connect(g).connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + 0.18);
+    }, 240);
+  }
+  function stopMusic() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; }
+
+  /* ===========================
+     INITIALIZATION
+  =========================== */
+  initPolaroids();
+  playLanding();
+  updateDoorLock();
+});
+</script>
+</body>
+</html>
