@@ -875,7 +875,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const stringsSvg = document.getElementById('string-svg');
   const sticky = document.getElementById('sticky');
   const polaroidData = [
-    { img: 'path/to/your/image1.png', text: "The day we met." },
+    { img: 'images/drivehome.png', text: "Did you remember this? You accompanied me in the train." },
     { img: 'path/to/your/image2.png', text: "Our first coffee." },
     { img: 'path/to/your/image3.png', text: "That rainy afternoon." },
     { img: 'path/to/your/image4.png', text: "When you made me laugh so hard." },
@@ -925,7 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
       p.innerHTML = `
       <div class="polaroid-inner">
         <div class="polaroid-front">
-            <div class="img" aria-hidden="true"></div>
+            <div class="img" style="background-image: url('${polaroidData[i].img}')" aria-hidden="true"></div>
             <div>polaroid #${i + 1}</div>
         </div>
         <div class="polaroid-back">
